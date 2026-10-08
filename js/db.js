@@ -1,22 +1,6 @@
 // Firebase is loaded via CDN globally in index.html
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCukSVaQOXQbQsFjrd87RdceZOwMKwDb7Q",
-  authDomain: "kssai-app.firebaseapp.com",
-  projectId: "kssai-app",
-  storageBucket: "kssai-app.firebasestorage.app",
-  messagingSenderId: "138198632868",
-  appId: "1:138198632868:web:c3ef3a960341721eaf9931"
-};
-
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
-const firestore = firebase.firestore();
-
-firestore.enablePersistence().catch(function(err) {
-    console.error("Firebase offline persistence failed:", err);
-});
+let firestore;
 
 class DBWrapper {
     async getAll(storeName) {
@@ -100,6 +84,26 @@ class DBWrapper {
 }
 
 async function initDB() {
+    const firebaseConfig = {
+      apiKey: "AIzaSyCukSVaQOXQbQsFjrd87RdceZOwMKwDb7Q",
+      authDomain: "kssai-app.firebaseapp.com",
+      projectId: "kssai-app",
+      storageBucket: "kssai-app.firebasestorage.app",
+      messagingSenderId: "138198632868",
+      appId: "1:138198632868:web:c3ef3a960341721eaf9931"
+    };
+
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    firestore = firebase.firestore();
+
+    try {
+        await firestore.enablePersistence();
+    } catch (err) {
+        console.warn("Firebase offline persistence failed:", err);
+    }
+
     return new DBWrapper();
 }
 
