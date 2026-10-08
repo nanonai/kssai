@@ -3,9 +3,86 @@ let expensesCategories = [
     '交通費', '駐車場代', '人件費', '広告宣伝費', '決済手数料', '通信費', '消耗品費', 'その他'
 ];
 
+let currentExpensePeriod = 'month'; // 'day', 'week', 'month', 'year'
+let currentExpenseDate = new Date();
+
+function getExpensePeriodBounds(date, period) {
+    const d = new Date(date);
+    d.setHours(0,0,0,0);
+    let start, end;
+    
+    if (period === 'day') {
+        start = new Date(d);
+        end = new Date(d);
+        end.setHours(23,59,59,999);
+    } else if (period === 'week') {
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+        start = new Date(d.setDate(diff));
+        start.setHours(0,0,0,0);
+        end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        end.setHours(23,59,59,999);
+    } else if (period === 'month') {
+        start = new Date(d.getFullYear(), d.getMonth(), 1);
+        end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        end.setHours(23,59,59,999);
+    } else if (period === 'year') {
+        start = new Date(d.getFullYear(), 0, 1);
+        end = new Date(d.getFullYear(), 11, 31);
+        end.setHours(23,59,59,999);
+    }
+    
+    return { start, end };
+}
+
+function getExpensePeriodLabel(date, period) {
+    if (period === 'day') {
+        return `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`;
+    } else if (period === 'week') {
+        const bounds = getExpensePeriodBounds(date, period);
+        return `${bounds.start.getMonth()+1}/${bounds.start.getDate()} - ${bounds.end.getMonth()+1}/${bounds.end.getDate()}`;
+    } else if (period === 'month') {
+        return `${date.getFullYear()}年${date.getMonth()+1}月`;
+    } else if (period === 'year') {
+        return `${date.getFullYear()}年`;
+    }
+}
+
+window.changeExpensePeriod = function(period) {
+    currentExpensePeriod = period;
+    loadExpenses();
+};
+
+window.navigateExpensePeriod = function(direction) {
+    if (currentExpensePeriod === 'day') {
+        currentExpenseDate.setDate(currentExpenseDate.getDate() + direction);
+    } else if (currentExpensePeriod === 'week') {
+        currentExpenseDate.setDate(currentExpenseDate.getDate() + (direction * 7));
+    } else if (currentExpensePeriod === 'month') {
+        currentExpenseDate.setMonth(currentExpenseDate.getMonth() + direction);
+    } else if (currentExpensePeriod === 'year') {
+        currentExpenseDate.setFullYear(currentExpenseDate.getFullYear() + direction);
+    }
+    loadExpenses();
+};
+
 async function loadExpenses() {
     const expenses = await db.getAll('expenses');
     expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    const bounds = getExpensePeriodBounds(currentExpenseDate, currentExpensePeriod);
+    const startStr = bounds.start.toLocaleDateString('sv-SE').split('T')[0];
+    const endStr = bounds.end.toLocaleDateString('sv-SE').split('T')[0];
+    
+    // Some expenses only have YYYY-MM-DD
+    const filteredExpenses = expenses.filter(e => {
+        const eDate = e.date.split('T')[0];
+        return eDate >= startStr && eDate <= endStr;
+    });
+    
+    const totalAmount = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const label = getExpensePeriodLabel(currentExpenseDate, currentExpensePeriod);
     
     const expensesSection = document.getElementById('expenses');
     expensesSection.innerHTML = `
@@ -59,9 +136,32 @@ async function loadExpenses() {
             </form>
         </div>
         
-        <h2 style="margin-bottom: 1rem;">経費履歴 (最近20件)</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+            <h2 style="margin: 0;">経費履歴</h2>
+        </div>
+        
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <button onclick="changeExpensePeriod('day')" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:8px; background:${currentExpensePeriod==='day'?'var(--accent-red)':'#fff'}; color:${currentExpensePeriod==='day'?'#fff':'#333'}">1日</button>
+            <button onclick="changeExpensePeriod('week')" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:8px; background:${currentExpensePeriod==='week'?'var(--accent-red)':'#fff'}; color:${currentExpensePeriod==='week'?'#fff':'#333'}">1週</button>
+            <button onclick="changeExpensePeriod('month')" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:8px; background:${currentExpensePeriod==='month'?'var(--accent-red)':'#fff'}; color:${currentExpensePeriod==='month'?'#fff':'#333'}">1ヶ月</button>
+            <button onclick="changeExpensePeriod('year')" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:8px; background:${currentExpensePeriod==='year'?'var(--accent-red)':'#fff'}; color:${currentExpensePeriod==='year'?'#fff':'#333'}">1年</button>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; background: #f9f9f9; padding: 0.5rem; border-radius: 8px;">
+            <button onclick="navigateExpensePeriod(-1)" style="padding: 0.5rem 1rem; border: none; background: transparent; font-size: 1.2rem; cursor: pointer;">◀</button>
+            <div style="font-weight: bold; font-size: 1.1rem;">${label}</div>
+            <button onclick="navigateExpensePeriod(1)" style="padding: 0.5rem 1rem; border: none; background: transparent; font-size: 1.2rem; cursor: pointer;">▶</button>
+        </div>
+        
+        <div class="card" style="margin-bottom: 1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:#666; font-weight:bold;">${label} の経費合計</span>
+                <span style="font-weight:bold; font-size:1.3rem; color:var(--accent-red);">¥${totalAmount.toLocaleString()}</span>
+            </div>
+        </div>
+
         <div>
-            ${expenses.slice(0, 20).map(e => `
+            ${filteredExpenses.map(e => `
                 <div class="card" style="margin-bottom: 0.5rem; padding: 1rem;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                         <span style="color: #666; font-size: 0.9rem;">${e.date}</span>
@@ -74,13 +174,16 @@ async function loadExpenses() {
                     ${e.memo ? `<div style="font-size: 0.9rem; margin-top: 0.5rem; color: #555;">${e.memo}</div>` : ''}
                 </div>
             `).join('')}
-            ${expenses.length === 0 ? '<p style="color:#888;">経費データがありません</p>' : ''}
+            ${filteredExpenses.length === 0 ? '<p style="color:#888;">この期間の経費データがありません</p>' : ''}
         </div>
     `;
     
-    // Set today as default
+    // Set today as default for new expense
     const todayStr = new Date().toLocaleDateString('sv-SE').split('T')[0]; // YYYY-MM-DD local time
-    document.getElementById('exp-date').value = todayStr;
+    const expDateInput = document.getElementById('exp-date');
+    if (expDateInput && !expDateInput.value) {
+        expDateInput.value = todayStr;
+    }
 }
 
 let expIsSubmitting = false;
