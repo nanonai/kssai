@@ -20,7 +20,7 @@ async function initApp() {
         showSection('pos');
     } catch (e) {
         console.error("DB Initialization error", e);
-        alert("データベースの初期化に失敗しました。");
+        alert("データベースの初期化に失敗しました。\nエラー詳細: " + e.message);
     }
 }
 
