@@ -67,13 +67,20 @@ window.navigateExpensePeriod = function(direction) {
     loadExpenses();
 };
 
+function formatDateToYMD(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
 async function loadExpenses() {
     const expenses = await db.getAll('expenses');
     expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
     
     const bounds = getExpensePeriodBounds(currentExpenseDate, currentExpensePeriod);
-    const startStr = bounds.start.toLocaleDateString('sv-SE').split('T')[0];
-    const endStr = bounds.end.toLocaleDateString('sv-SE').split('T')[0];
+    const startStr = formatDateToYMD(bounds.start);
+    const endStr = formatDateToYMD(bounds.end);
     
     // Some expenses only have YYYY-MM-DD
     const filteredExpenses = expenses.filter(e => {
@@ -179,7 +186,7 @@ async function loadExpenses() {
     `;
     
     // Set today as default for new expense
-    const todayStr = new Date().toLocaleDateString('sv-SE').split('T')[0]; // YYYY-MM-DD local time
+    const todayStr = formatDateToYMD(new Date());
     const expDateInput = document.getElementById('exp-date');
     if (expDateInput && !expDateInput.value) {
         expDateInput.value = todayStr;
