@@ -1,49 +1,106 @@
-// idb library is loaded via CDN globally
-const DB_NAME = 'NamelessShopDB';
-const DB_VERSION = 1;
+// Firebase is loaded via CDN globally in index.html
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCukSVaQOXQbQsFjrd87RdceZOwMKwDb7Q",
+  authDomain: "kssai-app.firebaseapp.com",
+  projectId: "kssai-app",
+  storageBucket: "kssai-app.firebasestorage.app",
+  messagingSenderId: "138198632868",
+  appId: "1:138198632868:web:c3ef3a960341721eaf9931"
+};
+
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const firestore = firebase.firestore();
+
+firestore.enablePersistence().catch(function(err) {
+    console.error("Firebase offline persistence failed:", err);
+});
+
+class DBWrapper {
+    async getAll(storeName) {
+        const snapshot = await firestore.collection(storeName).get();
+        return snapshot.docs.map(d => d.data());
+    }
+
+    async get(storeName, id) {
+        const doc = await firestore.collection(storeName).doc(String(id)).get();
+        return doc.exists ? doc.data() : undefined;
+    }
+
+    async getAllFromIndex(storeName, indexName, key = null) {
+        if (key) {
+            const snapshot = await firestore.collection(storeName).where(indexName, '==', key).get();
+            return snapshot.docs.map(d => d.data());
+        }
+        return this.getAll(storeName);
+    }
+    
+    async count(storeName) {
+        const snapshot = await firestore.collection(storeName).get();
+        return snapshot.size;
+    }
+
+    async put(storeName, data) {
+        let id = data.id || data.key;
+        if (!id) {
+            id = firestore.collection(storeName).doc().id;
+            if (storeName === 'settings') data.key = id;
+            else data.id = id;
+        }
+        await firestore.collection(storeName).doc(String(id)).set(data);
+    }
+
+    async delete(storeName, id) {
+        await firestore.collection(storeName).doc(String(id)).delete();
+    }
+
+    transaction(storeNames, mode) {
+        const batch = firestore.batch();
+        let committed = false;
+        const tx = {
+            objectStore: (storeName) => {
+                return {
+                    put: (data) => {
+                        let id = data.id || data.key;
+                        const docRef = firestore.collection(storeName).doc(String(id));
+                        batch.set(docRef, data);
+                    },
+                    delete: (id) => {
+                        const docRef = firestore.collection(storeName).doc(String(id));
+                        batch.delete(docRef);
+                    },
+                    get: async (id) => {
+                        const doc = await firestore.collection(storeName).doc(String(id)).get();
+                        return doc.exists ? doc.data() : undefined;
+                    },
+                    getAll: async () => {
+                        const snapshot = await firestore.collection(storeName).get();
+                        return snapshot.docs.map(d => d.data());
+                    },
+                    count: async () => {
+                        const snapshot = await firestore.collection(storeName).get();
+                        return snapshot.size;
+                    }
+                };
+            }
+        };
+        Object.defineProperty(tx, 'done', {
+            get: function() {
+                if (!committed) {
+                    committed = true;
+                    return batch.commit();
+                }
+                return Promise.resolve();
+            }
+        });
+        return tx;
+    }
+}
 
 async function initDB() {
-    return window.idb.openDB(DB_NAME, DB_VERSION, {
-        upgrade(db) {
-            // Products
-            if (!db.objectStoreNames.contains('products')) {
-                const store = db.createObjectStore('products', { keyPath: 'id' });
-                store.createIndex('category', 'category');
-                store.createIndex('order', 'order');
-            }
-            // Toppings
-            if (!db.objectStoreNames.contains('toppings')) {
-                db.createObjectStore('toppings', { keyPath: 'id' });
-            }
-            // Sales
-            if (!db.objectStoreNames.contains('sales')) {
-                const store = db.createObjectStore('sales', { keyPath: 'id' });
-                store.createIndex('date', 'date');
-                store.createIndex('location', 'location');
-            }
-            // Sale Items
-            if (!db.objectStoreNames.contains('sale_items')) {
-                const store = db.createObjectStore('sale_items', { keyPath: 'id' });
-                store.createIndex('sale_id', 'sale_id');
-                store.createIndex('product_id', 'product_id');
-            }
-            // Expenses
-            if (!db.objectStoreNames.contains('expenses')) {
-                const store = db.createObjectStore('expenses', { keyPath: 'id' });
-                store.createIndex('date', 'date');
-                store.createIndex('category', 'category');
-            }
-            // Transactions (Funds)
-            if (!db.objectStoreNames.contains('transactions')) {
-                const store = db.createObjectStore('transactions', { keyPath: 'id' });
-                store.createIndex('date', 'date');
-            }
-            // Settings
-            if (!db.objectStoreNames.contains('settings')) {
-                db.createObjectStore('settings', { keyPath: 'key' });
-            }
-        }
-    });
+    return new DBWrapper();
 }
 
 // Initial Data Population
