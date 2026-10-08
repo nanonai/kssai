@@ -3,27 +3,60 @@
 let firestore;
 
 class DBWrapper {
+    constructor() {
+        this.cache = {};
+        this.listeners = {};
+        this.initialLoadPromises = {};
+    }
+
+    _ensureListener(storeName) {
+        if (!this.listeners[storeName]) {
+            this.cache[storeName] = {};
+            this.initialLoadPromises[storeName] = new Promise((resolve) => {
+                let isFirstLoad = true;
+                this.listeners[storeName] = firestore.collection(storeName).onSnapshot(snapshot => {
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'removed') {
+                            delete this.cache[storeName][change.doc.id];
+                        } else {
+                            this.cache[storeName][change.doc.id] = change.doc.data();
+                        }
+                    });
+                    if (isFirstLoad) {
+                        isFirstLoad = false;
+                        resolve();
+                    }
+                }, err => {
+                    console.error("Firestore listener error for " + storeName, err);
+                    if (isFirstLoad) resolve(); // Resolve to not block app
+                });
+            });
+        }
+        return this.initialLoadPromises[storeName];
+    }
+
     async getAll(storeName) {
-        const snapshot = await firestore.collection(storeName).get();
-        return snapshot.docs.map(d => d.data());
+        await this._ensureListener(storeName);
+        return Object.values(this.cache[storeName]);
     }
 
     async get(storeName, id) {
-        const doc = await firestore.collection(storeName).doc(String(id)).get();
-        return doc.exists ? doc.data() : undefined;
+        await this._ensureListener(storeName);
+        return this.cache[storeName][String(id)];
     }
 
     async getAllFromIndex(storeName, indexName, key = null) {
+        await this._ensureListener(storeName);
+        const all = Object.values(this.cache[storeName]);
         if (key) {
-            const snapshot = await firestore.collection(storeName).where(indexName, '==', key).get();
-            return snapshot.docs.map(d => d.data());
+            return all.filter(item => item[indexName] === key);
         }
-        return this.getAll(storeName);
+        return all;
     }
     
     async count(storeName) {
-        const snapshot = await firestore.collection(storeName).get();
-        return snapshot.size;
+        await this._ensureListener(storeName);
+        return Object.keys(this.cache[storeName]).length;
     }
 
     async put(storeName, data) {
@@ -56,16 +89,13 @@ class DBWrapper {
                         batch.delete(docRef);
                     },
                     get: async (id) => {
-                        const doc = await firestore.collection(storeName).doc(String(id)).get();
-                        return doc.exists ? doc.data() : undefined;
+                        return this.get(storeName, id);
                     },
                     getAll: async () => {
-                        const snapshot = await firestore.collection(storeName).get();
-                        return snapshot.docs.map(d => d.data());
+                        return this.getAll(storeName);
                     },
                     count: async () => {
-                        const snapshot = await firestore.collection(storeName).get();
-                        return snapshot.size;
+                        return this.count(storeName);
                     }
                 };
             }
