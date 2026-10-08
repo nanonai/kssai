@@ -7,6 +7,9 @@ let currentExpensePeriod = 'month'; // 'day', 'week', 'month', 'year'
 let currentExpenseDate = new Date();
 
 function getExpensePeriodBounds(date, period) {
+    if (period === 'all') {
+        return { start: new Date(2000, 0, 1), end: new Date(2100, 11, 31) };
+    }
     const d = new Date(date);
     d.setHours(0,0,0,0);
     let start, end;
@@ -37,7 +40,9 @@ function getExpensePeriodBounds(date, period) {
 }
 
 function getExpensePeriodLabel(date, period) {
-    if (period === 'day') {
+    if (period === 'all') {
+        return `全期間`;
+    } else if (period === 'day') {
         return `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`;
     } else if (period === 'week') {
         const bounds = getExpensePeriodBounds(date, period);
@@ -55,6 +60,7 @@ window.changeExpensePeriod = function(period) {
 };
 
 window.navigateExpensePeriod = function(direction) {
+    if (currentExpensePeriod === 'all') return;
     if (currentExpensePeriod === 'day') {
         currentExpenseDate.setDate(currentExpenseDate.getDate() + direction);
     } else if (currentExpensePeriod === 'week') {
@@ -147,14 +153,15 @@ async function loadExpenses() {
             <h2 style="margin: 0;">経費履歴</h2>
         </div>
         
-        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; overflow-x: auto; white-space: nowrap; padding-bottom: 0.5rem;">
             <button onclick="changeExpensePeriod('day')" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:8px; background:${currentExpensePeriod==='day'?'var(--accent-red)':'#fff'}; color:${currentExpensePeriod==='day'?'#fff':'#333'}">1日</button>
             <button onclick="changeExpensePeriod('week')" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:8px; background:${currentExpensePeriod==='week'?'var(--accent-red)':'#fff'}; color:${currentExpensePeriod==='week'?'#fff':'#333'}">1週</button>
             <button onclick="changeExpensePeriod('month')" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:8px; background:${currentExpensePeriod==='month'?'var(--accent-red)':'#fff'}; color:${currentExpensePeriod==='month'?'#fff':'#333'}">1ヶ月</button>
             <button onclick="changeExpensePeriod('year')" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:8px; background:${currentExpensePeriod==='year'?'var(--accent-red)':'#fff'}; color:${currentExpensePeriod==='year'?'#fff':'#333'}">1年</button>
+            <button onclick="changeExpensePeriod('all')" style="flex:1; padding:0.5rem; border:1px solid var(--border-color); border-radius:8px; background:${currentExpensePeriod==='all'?'var(--accent-red)':'#fff'}; color:${currentExpensePeriod==='all'?'#fff':'#333'}">全期間</button>
         </div>
         
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; background: #f9f9f9; padding: 0.5rem; border-radius: 8px;">
+        <div style="display: ${currentExpensePeriod === 'all' ? 'none' : 'flex'}; justify-content: space-between; align-items: center; margin-bottom: 1rem; background: #f9f9f9; padding: 0.5rem; border-radius: 8px;">
             <button onclick="navigateExpensePeriod(-1)" style="padding: 0.5rem 1rem; border: none; background: transparent; font-size: 1.2rem; cursor: pointer;">◀</button>
             <div style="font-weight: bold; font-size: 1.1rem;">${label}</div>
             <button onclick="navigateExpensePeriod(1)" style="padding: 0.5rem 1rem; border: none; background: transparent; font-size: 1.2rem; cursor: pointer;">▶</button>

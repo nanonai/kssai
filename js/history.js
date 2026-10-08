@@ -6,7 +6,7 @@ async function loadHistory() {
     
     const historySection = document.getElementById('history');
     historySection.innerHTML = `
-        <h2 style="margin-bottom: 1rem;">売上履歴 (最近50件)</h2>
+        <h2 style="margin-bottom: 1rem;">売上履歴</h2>
         <div id="history-list"></div>
     `;
     
@@ -25,8 +25,8 @@ async function renderHistoryCards() {
     // We fetch items so we can show "Main products" on the card
     const allItems = await db.getAll('sale_items');
     
-    // Limit to 50 for performance on mobile
-    const recentSales = allSales.slice(0, 50);
+    // Remove limit to show all history
+    const recentSales = allSales;
     
     recentSales.forEach(sale => {
         const saleItems = allItems.filter(i => i.sale_id === sale.id);
