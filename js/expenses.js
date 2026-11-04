@@ -186,6 +186,9 @@ async function loadExpenses() {
                         <span style="font-weight: bold; font-size: 1.2rem; color: var(--accent-red);">¥${e.amount.toLocaleString()}</span>
                     </div>
                     ${e.memo ? `<div style="font-size: 0.9rem; margin-top: 0.5rem; color: #555;">${e.memo}</div>` : ''}
+                    <div style="text-align: right; margin-top: 0.5rem;">
+                        <button onclick="deleteExpense('${e.id}')" style="padding: 0.3rem 0.75rem; background: #fff; color: var(--accent-red); border: 1px solid var(--accent-red); border-radius: 4px; font-size: 0.8rem; cursor: pointer;">🗑 削除</button>
+                    </div>
                 </div>
             `).join('')}
             ${filteredExpenses.length === 0 ? '<p style="color:#888;">この期間の経費データがありません</p>' : ''}
@@ -260,6 +263,26 @@ async function saveExpense(e) {
         }
     }
 }
+
+async function deleteExpense(id) {
+    const expenses = await db.getAll('expenses');
+    const exp = expenses.find(x => x.id === id);
+    if (!exp) return;
+    if (!confirm(`${exp.date} ${exp.category} ¥${exp.amount.toLocaleString()} を削除しますか？\n※この操作は元に戻せません。`)) return;
+    try {
+        const txs = await db.getAll('transactions');
+        const related = txs.filter(t => t.ref_id === id);
+        for (const t of related) {
+            await db.delete('transactions', t.id);
+        }
+        await db.delete('expenses', id);
+        loadExpenses();
+    } catch (err) {
+        console.error(err);
+        alert('削除に失敗しました。\n' + err.message);
+    }
+}
+window.deleteExpense = deleteExpense;
 
 async function markExpensePaid(id, amount) {
     const account = prompt(`未払経費 (¥${amount.toLocaleString()}) を支払います。\n支払元を入力してください（現金 / 銀行A / 個人の立替 など）`, '現金');
